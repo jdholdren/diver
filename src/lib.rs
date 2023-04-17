@@ -16,7 +16,7 @@ pub async fn holepunch(remote_addr: SocketAddr) -> Result<UdpSocket> {
 }
 
 // Performs the holepunch and returns a socket that has successfully made it out
-async fn perform_holepunch(sock: UdpSocket, remote_addr: SocketAddr) -> Result<UdpSocket> {
+pub async fn perform_holepunch(sock: UdpSocket, remote_addr: SocketAddr) -> Result<UdpSocket> {
     println!("We're listening on: {}", sock.local_addr()?.port());
 
     let mut rng = StdRng::from_entropy();
@@ -27,7 +27,7 @@ async fn perform_holepunch(sock: UdpSocket, remote_addr: SocketAddr) -> Result<U
 
     let mut buf = [0; 1024];
 
-    for _i in 0..HOLE_PUNCH_MAX_TRIES {
+    'unconfirmed: for _i in 0..HOLE_PUNCH_MAX_TRIES {
         // Start with a send
         let msg = HolePunchMessage { seed, known_seed };
         let marshalled = serde_json::to_string(&msg)?;
@@ -40,8 +40,6 @@ async fn perform_holepunch(sock: UdpSocket, remote_addr: SocketAddr) -> Result<U
         )
         .await
         {
-            // TODO: Clear the buffer
-            println!("Buffer: {:?}", buf);
             // We get a response parse it out
             let msg: HolePunchMessage = match serde_json::from_slice(&buf[0..msg_size]) {
                 Ok(msg) => msg,
@@ -50,7 +48,6 @@ async fn perform_holepunch(sock: UdpSocket, remote_addr: SocketAddr) -> Result<U
                     continue;
                 }
             };
-            println!("Got message: {:?}", msg);
             // If we don't have a known seed, set it and continue
             if known_seed.is_none() {
                 known_seed = Some(msg.seed);
@@ -63,14 +60,23 @@ async fn perform_holepunch(sock: UdpSocket, remote_addr: SocketAddr) -> Result<U
             // Check if the remote knows our seed
             if msg.known_seed.unwrap_or(0) == seed {
                 // The remote knows us, we're done!
-                return Ok(sock);
+                break 'unconfirmed;
             }
         };
-
-        println!("Trying again...");
     }
 
-    Err(anyhow!("too many tries holepunching"))
+    if known_seed.is_none() {
+        return Err(anyhow!("too many tries holepunching"));
+    }
+
+    // Send the message again to make sure the remote got it
+    let msg = HolePunchMessage { seed, known_seed };
+    let marshalled = serde_json::to_string(&msg)?;
+    for _i in 0..3 {
+        sock.send_to(marshalled.as_bytes(), remote_addr).await?;
+    }
+
+    Ok(sock)
 }
 
 // Represents what each client sends during the holepunch
