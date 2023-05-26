@@ -7,6 +7,8 @@ use std::str;
 use tokio::net::UdpSocket;
 use tokio::time;
 
+pub mod wg;
+
 const HOLE_PUNCH_MAX_TRIES: u16 = 10;
 
 pub async fn holepunch(remote_addr: SocketAddr) -> Result<UdpSocket> {

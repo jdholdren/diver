@@ -1,52 +1,24 @@
-use anyhow::Result;
-use clap::{arg, Command};
-use std::net::SocketAddr;
-use tokio::net::UdpSocket;
+// use clap::Error;
+// use clap::{arg, Command};
 
-fn cli() -> Command {
-    Command::new("diver")
-        .about("The main diver client")
-        .subcommand_required(true)
-        .subcommand(Command::new("send").about("Sends a file"))
-        .subcommand(Command::new("recv").about("Receives a file"))
-        .arg(arg!(-r --remote <port> "the remote port for testing purposes").required(true))
-        .arg(arg!(-p --port <port> "the host port for testing purposes").required(true))
-}
+// fn cli() -> Command {
+//     Command::new("diver")
+//         .about("The main diver client")
+//         .subcommand_required(true)
+//         .subcommand(Command::new("send").about("Sends a file"))
+//         .subcommand(Command::new("recv").about("Receives a file"))
+//         .subcommand(Command::new("mid").about("The mid thing"))
+//     // .arg(arg!(-r --remote <port> "the remote port for testing purposes").required(true))
+//     // .arg(arg!(-p --port <port> "the host port for testing purposes").required(true))
+// }
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    let matches = cli().get_matches();
+async fn main() {
+    let role: String = std::env::var("ROLE").unwrap_or(String::new());
 
-    // DEBUG: make a socket to listen on, and determine the remote address
-    let sock = UdpSocket::bind((
-        "127.0.0.1",
-        matches
-            .get_one::<String>("port")
-            .unwrap()
-            .parse::<u16>()
-            .unwrap(),
-    ))
-    .await?;
-    let remote: SocketAddr = format!(
-        "127.0.0.1:{}",
-        matches
-            .get_one::<String>("remote")
-            .unwrap()
-            .parse::<u16>()
-            .unwrap()
-    )
-    .parse()?;
+    if role == "send" {}
 
-    match matches.subcommand() {
-        Some(("send", submatches)) => {
-            // TODO: Open the file, start sending over wireguard
-            // Hole punch it up
-            let sock = diver::perform_holepunch(sock, remote).await?;
-        }
-        _ => unreachable!(),
-    };
+    if role == "recv" {}
 
-    Ok(())
+    unreachable!();
 }
-
-// TODO: Make a function that generates a private/public key pair
